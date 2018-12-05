@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
+import org.springframework.data.mongodb.core.mapping.event.MongoMappingEvent;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
@@ -16,7 +17,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.util.ReflectionUtils;
 
 @Repository
-class BloomRepositoryBean<T, ID> implements BloomRepository<T, ID> {
+class CustomizedMongoRepositoryImpl<T, ID> implements CustomizedMongoRepository<T, ID> {
 
     private static final String ID_FIELD_NAME = "_id";
     private static final String MAYBE_EMIT_EVENT_METHOD_NAME = "maybeEmitEvent";
@@ -24,7 +25,7 @@ class BloomRepositoryBean<T, ID> implements BloomRepository<T, ID> {
     private final MappingMongoConverter mappingMongoConverter;
 
     @Autowired
-    public BloomRepositoryBean(
+    public CustomizedMongoRepositoryImpl(
             MongoTemplate mongoTemplate,
             MappingMongoConverter mappingMongoConverter) {
         this.mongoTemplate = mongoTemplate;
@@ -32,7 +33,7 @@ class BloomRepositoryBean<T, ID> implements BloomRepository<T, ID> {
     }
 
     @Override
-    public T upsert(T entity) {
+    public <S extends T> S save(S entity) {
         final Query query = new Query();
         query.addCriteria(Criteria.where(ID_FIELD_NAME).is(Extractor.getEntityId(entity)));
         Update update = new Update();
@@ -67,7 +68,7 @@ class BloomRepositoryBean<T, ID> implements BloomRepository<T, ID> {
     private void emitAfterUpsertEvent(T entity, Document document, T oldEntity) {
         Method maybeEmitEvent;
         try {
-            maybeEmitEvent = mongoTemplate.getClass().getDeclaredMethod(MAYBE_EMIT_EVENT_METHOD_NAME);
+            maybeEmitEvent = mongoTemplate.getClass().getDeclaredMethod(MAYBE_EMIT_EVENT_METHOD_NAME, MongoMappingEvent.class);
         } catch (NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
